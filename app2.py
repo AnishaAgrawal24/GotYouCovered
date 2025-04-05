@@ -119,20 +119,16 @@ if st.session_state.final_text:
     file_format = st.selectbox("Select Format", ["TXT", "DOCX", "PDF"])
     save_text = st.session_state.final_text
 
-    col1, col2, col3 = st.columns(3)
     if file_format == "TXT":
         txt_buffer = BytesIO(save_text.encode("utf-8"))
-        with col1:
             st.download_button("📄 TXT", txt_buffer, file_name="Cover_Letter.txt")
 
     elif file_format == "DOCX":
         file = generate_docx(save_text)
-        with col2:
             st.download_button("📝 DOCX", file, file_name="Cover_Letter.docx")
 
     elif file_format == "PDF":
         file = generate_pdf(save_text)
-        with col3:
             st.download_button("📕 PDF", file, file_name="Cover_Letter.pdf")
 
 # Footer
