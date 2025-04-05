@@ -121,15 +121,15 @@ if st.session_state.final_text:
 
     if file_format == "TXT":
         txt_buffer = BytesIO(save_text.encode("utf-8"))
-            st.download_button("📄 TXT", txt_buffer, file_name="Cover_Letter.txt")
+        st.download_button("📄 TXT", txt_buffer, file_name="Cover_Letter.txt")
 
     elif file_format == "DOCX":
         file = generate_docx(save_text)
-            st.download_button("📝 DOCX", file, file_name="Cover_Letter.docx")
+        st.download_button("📝 DOCX", file, file_name="Cover_Letter.docx")
 
     elif file_format == "PDF":
         file = generate_pdf(save_text)
-            st.download_button("📕 PDF", file, file_name="Cover_Letter.pdf")
+        st.download_button("📕 PDF", file, file_name="Cover_Letter.pdf")
 
 # Footer
 st.markdown("---")
