@@ -40,28 +40,42 @@ def generate_pdf(text):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-
     safe_text = sanitize_text(text)
     for line in safe_text.split("\n"):
         pdf.cell(200, 10, txt=line, ln=True)
-
-    pdf_bytes = pdf.output(dest='S').encode('latin-1')  # Get PDF as bytes
-    buffer = BytesIO(pdf_bytes)                         # Put bytes into buffer
+    pdf_bytes = pdf.output(dest='S').encode('latin-1')
+    buffer = BytesIO(pdf_bytes)
     buffer.seek(0)
     return buffer
 
 # App UI
-st.title("📝 AutoCoverLetter")
+st.set_page_config(page_title="GotYouCovered", page_icon="📝", layout="centered")
+st.title("📝 GotYouCovered")
+st.markdown("Generate a customized cover letter using your resume and job description with AI ✨")
 
-resume_file = st.file_uploader("Upload your resume (.pdf or .docx)", type=["pdf", "docx"])
-job_title = st.text_input("Enter the job title or description")
-tone = st.selectbox("Choose a tone", ["Professional", "Friendly", "Enthusiastic"])
+st.markdown("---")
 
-# Initialize session state
+# Input Section
+col1, col2 = st.columns(2)
+with col1:
+    resume_file = st.file_uploader("📄 Upload Resume (.pdf or .docx)", type=["pdf", "docx"])
+with col2:
+    tone = st.selectbox("🎯 Choose a Tone", ["Professional", "Friendly", "Enthusiastic"])
+
+with st.form("cover_letter_form"):
+    job_title = st.text_input("💼 Job Title or Description")
+
+    with st.expander("➕ Add Important Points (Optional)"):
+        additional_points = st.text_area("💬 Anything specific you'd like to highlight?")
+
+    generate_button = st.form_submit_button("🚀 Generate Cover Letter")
+
+# Session state to hold generated text
 if 'final_text' not in st.session_state:
     st.session_state.final_text = None
 
-if resume_file and job_title and st.button("Generate Cover Letter"):
+# Generate cover letter
+if generate_button and resume_file and job_title:
     resume_text = extract_text(resume_file)
 
     prompt = f"""
@@ -70,7 +84,10 @@ if resume_file and job_title and st.button("Generate Cover Letter"):
     Resume: {resume_text[:4000]}
     """
 
-    with st.spinner("Generating..."):
+    if additional_points.strip():
+        prompt += f"\n\nImportant points to include:\n{additional_points.strip()}"
+
+    with st.spinner("Generating your custom cover letter..."):
         data = {
             "model": "deepseek/deepseek-chat:free",
             "messages": [
@@ -94,21 +111,29 @@ if resume_file and job_title and st.button("Generate Cover Letter"):
 
 # Display output and download options
 if st.session_state.final_text:
-    st.subheader("Generated Cover Letter")
-    st.text_area("Output", st.session_state.final_text, height=300)
+    st.markdown("---")
+    st.subheader("📄 Generated Cover Letter")
+    st.text_area("✍️ Output", st.session_state.final_text, height=300)
 
-    file_format = st.selectbox("Choose format to download", ["TXT", "DOCX", "PDF"])
-
+    st.markdown("### 📥 Download Cover Letter")
+    file_format = st.selectbox("Select Format", ["TXT", "DOCX", "PDF"])
     save_text = st.session_state.final_text
 
+    col1, col2, col3 = st.columns(3)
     if file_format == "TXT":
         txt_buffer = BytesIO(save_text.encode("utf-8"))
-        st.download_button("📄 Download TXT", txt_buffer, file_name="Cover_Letter.txt")
+        with col1:
+            st.download_button("📄 TXT", txt_buffer, file_name="Cover_Letter.txt")
 
     elif file_format == "DOCX":
         file = generate_docx(save_text)
-        st.download_button("📄 Download DOCX", file, file_name="Cover_Letter.docx")
+        with col2:
+            st.download_button("📝 DOCX", file, file_name="Cover_Letter.docx")
 
     elif file_format == "PDF":
         file = generate_pdf(save_text)
-        st.download_button("📄 Download PDF", file, file_name="Cover_Letter.pdf")
+        with col3:
+            st.download_button("📕 PDF", file, file_name="Cover_Letter.pdf")
+
+# Footer
+st.markdown("---")
