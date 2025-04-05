@@ -1,19 +1,13 @@
 import streamlit as st
 import requests
-
 from docx import Document
 from fpdf import FPDF
-
 import fitz  # PyMuPDF
-# from face import generator
-from salmon import generate_cover_letter
-import secrets as s
-
 import os
-# client = OpenAI(api_key=st.secrets["api_keys"]["OPENAI_API_KEY"])
-# client  = OpenAI(api_key="sk-cd9eda74d5804f918597dabcd8e32f87", base_url = "https://api.deepseek.com")
+from io import BytesIO
+import unicodedata
 
-# Define the headers for the API request
+# API Setup
 API_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 headers = {
@@ -21,8 +15,7 @@ headers = {
     'Content-Type': 'application/json'
 }
 
-
-
+# Utility functions
 def extract_text(file):
     if file.name.endswith(".pdf"):
         doc = fitz.open(stream=file.read(), filetype="pdf")
@@ -40,67 +33,82 @@ def generate_docx(text):
     buffer.seek(0)
     return buffer
 
+def sanitize_text(text):
+    return unicodedata.normalize("NFKD", text).encode("latin-1", "ignore").decode("latin-1")
+
 def generate_pdf(text):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-    for line in text.split("\n"):
+
+    safe_text = sanitize_text(text)
+    for line in safe_text.split("\n"):
         pdf.cell(200, 10, txt=line, ln=True)
-    buffer = BytesIO()
-    pdf.output(buffer)
+
+    pdf_bytes = pdf.output(dest='S').encode('latin-1')  # Get PDF as bytes
+    buffer = BytesIO(pdf_bytes)                         # Put bytes into buffer
     buffer.seek(0)
     return buffer
+
+# App UI
 st.title("📝 AutoCoverLetter")
 
 resume_file = st.file_uploader("Upload your resume (.pdf or .docx)", type=["pdf", "docx"])
 job_title = st.text_input("Enter the job title or description")
 tone = st.selectbox("Choose a tone", ["Professional", "Friendly", "Enthusiastic"])
 
-if st.button("Generate Cover Letter") and resume_file and job_title:
-    resume_text = extract_text(resume_file)
+# Initialize session state
+if 'final_text' not in st.session_state:
+    st.session_state.final_text = None
 
+if resume_file and job_title and st.button("Generate Cover Letter"):
+    resume_text = extract_text(resume_file)
 
     prompt = f"""
     Write a {tone.lower()} cover letter for the following job:
     Job: {job_title}
     Resume: {resume_text[:4000]}
     """
+
     with st.spinner("Generating..."):
-        # Define the request payload (data)
         data = {
             "model": "deepseek/deepseek-chat:free",
             "messages": [
-                {"role": "system", "content": "You are a cover letter generator. Extract the candidate's name, email, and any contact info "
-            "from the resume and include it in the letter. Only return the final cover letter text. "
-            "Do not explain, apologize, or output anything else."},
-
+                {
+                    "role": "system",
+                    "content": "You are a cover letter generator. Extract the candidate's name, email, and any contact info "
+                               "from the resume and include it in the letter. Only return the final cover letter text. "
+                               "Do not explain, apologize, or output anything else."
+                },
                 {"role": "user", "content": prompt}
-                ]
+            ]
         }
-        
-        os.environ['NO_PROXY'] = 'openrouter.ai'
 
+        os.environ['NO_PROXY'] = 'openrouter.ai'
         response = requests.post(API_URL, json=data, headers=headers)
 
         if response.status_code == 200:
-            final_text =  response.json()["choices"][0]["message"]["content"]
-            st.session_state.final_text = final_text
-
-            print("API Response:", response.json())
-            st.subheader("Generated Cover Letter")
-            st.text_area("Output", st.session_state.final_text, height=300)
-            
-            file_format = st.selectbox("Choose format", ["TXT", "DOCX", "PDF"])
-
-            if st.button("Generate File"):
-                save_text = st.session_state.final_text
-                if file_format == "TXT":
-                    st.download_button("Download as .txt", save_text, file_name="Cover Letter.txt")
-                if file_format == "DOCX":
-                    file = generate_docx(save_text)
-                    st.download_button("Download DOCX", file, "Cover Letter.docx")
-                else:
-                    file = generate_pdf(save_text)
-                    st.download_button("Download PDF", file, "Cover Letter.pdf")
+            st.session_state.final_text = response.json()["choices"][0]["message"]["content"]
         else:
-            print("Failed to fetch data from API. Status Code:", response.status_code)
+            st.error(f"Failed to fetch data from API. Status Code: {response.status_code}")
+
+# Display output and download options
+if st.session_state.final_text:
+    st.subheader("Generated Cover Letter")
+    st.text_area("Output", st.session_state.final_text, height=300)
+
+    file_format = st.selectbox("Choose format to download", ["TXT", "DOCX", "PDF"])
+
+    save_text = st.session_state.final_text
+
+    if file_format == "TXT":
+        txt_buffer = BytesIO(save_text.encode("utf-8"))
+        st.download_button("📄 Download TXT", txt_buffer, file_name="Cover_Letter.txt")
+
+    elif file_format == "DOCX":
+        file = generate_docx(save_text)
+        st.download_button("📄 Download DOCX", file, file_name="Cover_Letter.docx")
+
+    elif file_format == "PDF":
+        file = generate_pdf(save_text)
+        st.download_button("📄 Download PDF", file, file_name="Cover_Letter.pdf")
