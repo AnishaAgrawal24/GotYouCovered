@@ -15,7 +15,7 @@ Easily create your cover letters!.
 ```bash
 git clone git@github.com:AnishaAgrawal24/GotYouCovered.git
 python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+source venv/bin/activate  # On Windows: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 streamlit run app2.py
